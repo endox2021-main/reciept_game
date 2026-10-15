@@ -3,6 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes, viewport-fit=cover">
     <title>Receipt Price Challenge</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -123,8 +126,30 @@
       <p>(Please rotate your device to portrait mode)</p>
     </div>
 
-    <script src="Build/Reciept_game.loader.js"></script>
     <script>
+      const APP_VERSION = "0.1.1";
+      const VERSION_KEY = "receipt_game_version";
+
+      async function clearOldCacheIfNeeded(version) {
+        try {
+          const cachedVersion = localStorage.getItem(VERSION_KEY);
+          if (cachedVersion !== version) {
+            console.log(`[Cache] Version mismatch: ${cachedVersion} -> ${version}. Clearing UnityCache...`);
+            if (window.indexedDB) {
+              window.indexedDB.deleteDatabase("UnityCache");
+            }
+            if ("caches" in window) {
+              const cacheKeys = await caches.keys();
+              await Promise.all(cacheKeys.map(function(key) { return caches.delete(key); }));
+            }
+            localStorage.setItem(VERSION_KEY, version);
+            console.log("[Cache] Cache cleared successfully for version:", version);
+          }
+        } catch (e) {
+          console.warn("[Cache] Cache clearing exception:", e);
+        }
+      }
+
       var canvas = document.querySelector("#unity-canvas");
       var warning = document.querySelector("#rotate-warning");
 
@@ -149,14 +174,23 @@
         canvas.style.position = "fixed";
       }
 
-      createUnityInstance(canvas, {
-        dataUrl: "Build/Reciept_game.data.unityweb",
-        frameworkUrl: "Build/Reciept_game.framework.js.unityweb",
-        codeUrl: "Build/Reciept_game.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "Dementia_phase3",
-        productVersion: "0.1.0",
+      // ล้าง Cache เมื่อเวอร์ชันเปลี่ยน แล้วโหลดตัวเกมพร้อม Cache-Busting Query String (?v=0.1.1)
+      clearOldCacheIfNeeded(APP_VERSION).then(function() {
+        var v = "?v=" + APP_VERSION;
+        var script = document.createElement("script");
+        script.src = "Build/Reciept_game.loader.js" + v;
+        script.onload = function() {
+          createUnityInstance(canvas, {
+            dataUrl: "Build/Reciept_game.data.unityweb" + v,
+            frameworkUrl: "Build/Reciept_game.framework.js.unityweb" + v,
+            codeUrl: "Build/Reciept_game.wasm.unityweb" + v,
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "DefaultCompany",
+            productName: "Dementia_phase3",
+            productVersion: APP_VERSION,
+          });
+        };
+        document.body.appendChild(script);
       });
     </script>
   </body>
